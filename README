@@ -1,0 +1,26 @@
+You'll need Python 3 and some other Python packages. I recommend using virtualenv
+(http://virtualenv.org) to create a local Python environment. Then you can do
+something like
+
+    $ virtualenv -p python3 myenv
+    $ myenv/bin/pip install bottle pycrypto requests
+
+Now, whenever you seen "python3" below, write "myenv/bin/python" instead.
+
+To generate a DAGA authentication context run:
+
+    $ python3 gencontext.py a_context
+
+This creates a random DAGA context and dumps a lot of data into the directory
+a_context. You can change the number of servers and clients with the -s and -c
+options respectively.
+
+The run DAGA servers locally, use the server_supervisor script:
+
+    $ python3 server_supervisor.py a_context
+
+Then in another terminal, you can perform a client authentication by running
+
+    $ python3 daga_client.py ctx/context.json ctx/client-0.json
+
+Hopefully that will not fail.
