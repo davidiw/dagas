@@ -3,6 +3,7 @@
 
 import argparse
 import json
+import multiprocessing
 import ssl
 import sys
 import uuid
@@ -20,6 +21,7 @@ class GlobalState:
     def __init__(self, contexts, servers):
         self.contexts = contexts
         self.servers = servers
+        self.pool = multiprocessing.Pool()
         self.active_auths = {}
         self.bindings = {}
 
@@ -65,7 +67,7 @@ def _internal_check_challenge_response(d):
                                        auth_ctx["initial_linkage_tag"],
                                        client_proof)
     msg_chain.server_proofs = [daga.ServerProof(*x) for x in d["server_proofs"]]
-    server.authenticate_client(ac, msg_chain)
+    msg_chain = state.pool.apply(server.authenticate_client, [ac, msg_chain])
     sp = msg_chain.server_proofs[-1]
     return {"proof" : (sp.T, sp.c, sp.r1, sp.r2)}
 
@@ -85,7 +87,7 @@ def _internal_bind_linkage_tag(d):
     msg_chain.server_proofs = [daga.ServerProof(*x) for x in d["server_proofs"]]
     # Verify everyone.
     for i in range(len(ac.server_keys)):
-        msg_chain.check_server_proof(ac, i)
+        assert state.pool.apply(msg_chain.check_server_proof, [ac, i])
     sig = daga.dsa_sign(server.private_key, d["bind"])
     linkage_tag = msg_chain.server_proofs[-1].T
     state.bindings[linkage_tag] = (d["bind"], sig)

@@ -146,6 +146,7 @@ class VerificationChain:
             h.update(elem_to_bytes(thing))
         if int.from_bytes(h.digest(), 'big') != p.c:
             raise ValueError("verifying server {}'s proof failed".format(i))
+        return True
 
 def elem_to_bytes(i):
     return i.to_bytes(P.bit_length() // 8, 'big')
@@ -251,6 +252,7 @@ class Server:
         r2 = (v2 - c*shared_secret) % Q
         my_proof = ServerProof(tag, c, r1, r2)
         msg_chain.server_proofs.append(my_proof)
+        return msg_chain
 
 class Challenge:
 
