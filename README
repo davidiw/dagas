@@ -3,7 +3,7 @@ You'll need Python 3 and some other Python packages. I recommend using virtualen
 something like
 
     $ virtualenv -p python3 myenv
-    $ myenv/bin/pip install bottle pycrypto requests
+    $ myenv/bin/pip install bottle pycrypto requests cherrypy
 
 Now, whenever you seen "python3" below, write "myenv/bin/python" instead.
 
@@ -21,6 +21,6 @@ The run DAGA servers locally, use the server_supervisor script:
 
 Then in another terminal, you can perform a client authentication by running
 
-    $ python3 daga_client.py ctx/context.json ctx/client-0.json
+    $ python3 daga_client.py -a ctx/context.json -p ctx/client-0.json
 
 Hopefully that will not fail.

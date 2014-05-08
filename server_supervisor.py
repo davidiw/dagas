@@ -21,7 +21,7 @@ def main():
         procs = []
         for i in range(n_servers):
             priv_file = os.path.join(opts.context_dir, "server-{}.json".format(i))
-            p = subprocess.Popen([sys.executable, "dagad.py", ac_file, priv_file],
+            p = subprocess.Popen([sys.executable, "dagad.py", "-a", ac_file, "-p", priv_file],
                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             procs.append(p)
         while True:

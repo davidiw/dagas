@@ -9,6 +9,7 @@ import uuid
 
 import requests
 
+from urllib.parse import urlparse
 from bottle import request, route, run
 
 import daga
@@ -16,8 +17,9 @@ import daga
 
 class GlobalState:
 
-    def __init__(self, contexts):
+    def __init__(self, contexts, servers):
         self.contexts = contexts
+        self.servers = servers
         self.active_auths = {}
         self.bindings = {}
 
@@ -100,7 +102,9 @@ def internal_bind_linkage_tag():
 def internal_call(me, srv, name, data):
     if srv == me.id:
         return globals()["_internal_" + name](data)
-    return requests.post("http://localhost:{}/internal/{}".format(12345 + srv, name),
+    return requests.post("http://{}:{}/internal/{}".format(
+                         state.servers[srv].hostname,
+                         state.servers[srv].port, name),
                          headers={"content-type" : "application/json"},
                          data=json.dumps(data)).json()
 
@@ -165,8 +169,11 @@ def main():
     global state
 
     p = argparse.ArgumentParser(description="Generate a DAGA auth context")
-    p.add_argument("auth_context")
-    p.add_argument("private_data")
+    p.add_argument("-a", "--auth_context", required=True,
+                   help="The path to the authentication context folder")
+    p.add_argument("-p", "--private_data", required=True,
+                   help="Path to the servers private data")
+    p.add_argument("-s", "--server_list", help="List of servers uris")
     opts = p.parse_args()
 
     with open(opts.auth_context, "r", encoding="utf-8") as fp:
@@ -183,10 +190,27 @@ def main():
         priv_data = json.load(fp)
         server = daga.Server(priv_data["n"], priv_data["private_key"], priv_data["secret"])
 
-    state = GlobalState({uuid : (ac, server)})
+    if opts.server_list != None:
+        with open(opts.server_list, "r", encoding="utf-8") as fp:
+            server_dict = json.load(fp)
+            servers = []
 
-    run(port=server.id + 12345)
+            assert len(server_dict) == len(ac.server_keys)
+            for i in range(len(ac.server_keys)):
+                uri = urlparse(server_dict[str(i)])
+                assert uri.hostname != None
+                assert uri.port != None
+                servers.append(uri)
+    else:
+        servers = []
+        for i in range(len(ac.server_keys)):
+            uri = urlparse("http://localhost:" + str(12345 + i))
+            servers.append(uri)
 
+    state = GlobalState({uuid : (ac, server)}, servers)
+
+    uri = servers[server.id]
+    run(server='cherrypy', host=uri.hostname, port=uri.port)
 
 if __name__ == "__main__":
     main()
