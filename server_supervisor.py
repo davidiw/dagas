@@ -30,11 +30,14 @@ def main():
         pass
     print("Cleaning up")
     for i, p in enumerate(procs):
+        p.kill()
         p.wait()
         print("Server {}".format(i))
-        print("-"*200)
+        print("-"*100)
+        print(p.stdout.read().decode("utf-8"))
+        print("-"*100)
         print(p.stderr.read().decode("utf-8"))
-        print("-"*200)
+        print("-"*100)
 
 if __name__ == "__main__":
     main()
