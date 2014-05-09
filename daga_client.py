@@ -67,15 +67,13 @@ def main():
         "auth_id" : resp["auth_id"],
         "C" : state.proof.C,
         "R" : state.proof.R,
-        "bind" : 42,
     }
     resp = requests.post("http://" + server.hostname + ":" + str(server.port) + "/authenticate",
                          headers={"content-type" : "application/json"},
                          data=json.dumps(d)).json()
     tag = resp["tag"]
-    for pub, tag_sig, bind_sig in zip(ac.server_keys, resp["tag_sigs"], resp["binding_sigs"]):
+    for pub, tag_sig in zip(ac.server_keys, resp["tag_sigs"]):
         daga.dsa_verify(pub, tag, tag_sig)
-        daga.dsa_verify(pub, 42, bind_sig)
     print("Well, that seemed to work.")
 
 if __name__ == "__main__":

@@ -88,13 +88,11 @@ def _internal_bind_linkage_tag(d):
     # Verify everyone.
     for i in range(len(ac.server_keys)):
         assert state.pool.apply(msg_chain.check_server_proof, [ac, i])
-    sig = daga.dsa_sign(server.private_key, d["bind"])
     linkage_tag = msg_chain.server_proofs[-1].T
-    state.bindings[linkage_tag] = (d["bind"], sig)
+    state.bindings[linkage_tag] = auth_ctx["ephemeral_public_key"]
     return {
         "tag" : linkage_tag,
-        "tag_sig" : daga.dsa_sign(server.private_key, linkage_tag),
-        "binding_sig" : sig
+        "tag_sig" : daga.dsa_sign(server.private_key, linkage_tag)
     }
 
 @route("/internal/bind_linkage_tag", method="POST")
@@ -151,20 +149,16 @@ def authenticate():
         proofs.append(d["proof"])
     r = {
         "auth_id" : client_data["auth_id"],
-        "bind" : client_data["bind"],
         "server_proofs" : proofs,
     }
     sigs = []
-    binding_sigs = []
     for i in range(len(ac.server_keys)):
         d = internal_call(server, i, "bind_linkage_tag", r)
         tag = d["tag"]
         sigs.append(d["tag_sig"])
-        binding_sigs.append(d["binding_sig"])
     return {
         "tag" : tag,
         "tag_sigs" : sigs,
-        "binding_sigs" : binding_sigs,
     }
 
 def main():
