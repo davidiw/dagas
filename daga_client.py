@@ -55,7 +55,7 @@ def main():
         "commitments" : state.commitments,
         "T" : state.T,
     }
-    resp = requests.post("http://" + server.hostname + ":" + str(server.port) + "/request_challenge",
+    resp = requests.post("http://" + server.netloc + "/request_challenge",
                          headers={"content-type" : "application/json"},
                          data=json.dumps(d)).json()
     auth_id = resp["auth_id"]
