@@ -30,6 +30,7 @@ def main():
         pass
     print("Cleaning up")
     for i, p in enumerate(procs):
+        # This is overkill but it  seems difficult to kindly kill of the pool
         p.kill()
         p.wait()
         print("Server {}".format(i))
