@@ -10,28 +10,34 @@ import uuid
 
 import requests
 
+from hashlib import sha512
 from urllib.parse import urlparse
 from bottle import request, route, run
 
 import daga
 
+class Context:
+
+    def __init__(self, auth_context, server, servers):
+        self.ac = auth_context
+        self.server = server
+        self.servers = servers
+        self.bindings = {}
 
 class GlobalState:
 
-    def __init__(self, contexts, servers):
+    def __init__(self, contexts):
         self.contexts = contexts
-        self.servers = servers
         self.pool = multiprocessing.Pool()
         self.active_auths = {}
-        self.bindings = {}
 
 def _internal_begin_challenge_generation(d):
     state.active_auths[d["auth_id"]] = d["client_data"]
-    ac, server = state.contexts[d["client_data"]["uuid"]]
+    context = state.contexts[d["client_data"]["uuid"]]
     part = daga.Rand.randrange(daga.Q)
     return {
         "n" : part,
-        "sig" : daga.dsa_sign(server.private_key, part),
+        "sig" : daga.dsa_sign(context.server.private_key, part),
     }
 
 @route("/internal/begin_challenge_generation", method="POST")
@@ -39,16 +45,16 @@ def internal_begin_challenge_generation():
     return _internal_begin_challenge_generation(request.json)
 
 def _internal_finish_challenge_generation(d):
-    ac, server = state.contexts[state.active_auths[d["auth_id"]]["uuid"]]
+    context = state.contexts[state.active_auths[d["auth_id"]]["uuid"]]
     challenge = 0
-    for pub, (part, sig) in zip(ac.server_keys, d["parts"]):
+    for pub, (part, sig) in zip(context.ac.server_keys, d["parts"]):
         daga.dsa_verify(pub, part, sig)
         challenge += part
     challenge %= daga.Q
     state.active_auths[d["auth_id"]]["challenge"] = challenge
     return {
         "challenge" : challenge,
-        "sig" : daga.dsa_sign(server.private_key, challenge),
+        "sig" : daga.dsa_sign(context.server.private_key, challenge),
     }
 
 @route("/internal/finish_challenge_generation", method="POST")
@@ -57,7 +63,7 @@ def internal_finish_challenge_generation():
 
 def _internal_check_challenge_response(d):
     auth_ctx = state.active_auths[d["auth_id"]]
-    ac, server = state.contexts[auth_ctx["uuid"]]
+    context = state.contexts[auth_ctx["uuid"]]
     client_proof = daga.ClientProof(d["C"], d["R"])
     auth_ctx["C"] = d["C"]
     auth_ctx["R"] = d["R"]
@@ -67,7 +73,7 @@ def _internal_check_challenge_response(d):
                                        auth_ctx["initial_linkage_tag"],
                                        client_proof)
     msg_chain.server_proofs = [daga.ServerProof(*x) for x in d["server_proofs"]]
-    msg_chain = state.pool.apply(server.authenticate_client, [ac, msg_chain])
+    msg_chain = state.pool.apply(context.server.authenticate_client, [context.ac, msg_chain])
     sp = msg_chain.server_proofs[-1]
     return {"proof" : (sp.T, sp.c, sp.r1, sp.r2)}
 
@@ -77,7 +83,7 @@ def internal_check_challenge_response():
 
 def _internal_bind_linkage_tag(d):
     auth_ctx = state.active_auths[d["auth_id"]]
-    ac, server = state.contexts[auth_ctx["uuid"]]
+    context = state.contexts[auth_ctx["uuid"]]
     client_proof = daga.ClientProof(auth_ctx["C"], auth_ctx["R"])
     msg_chain = daga.VerificationChain(daga.Challenge(auth_ctx["challenge"], auth_ctx["T"]),
                                        auth_ctx["ephemeral_public_key"],
@@ -86,48 +92,67 @@ def _internal_bind_linkage_tag(d):
                                        client_proof)
     msg_chain.server_proofs = [daga.ServerProof(*x) for x in d["server_proofs"]]
     # Verify everyone.
-    for i in range(len(ac.server_keys)):
-        assert state.pool.apply(msg_chain.check_server_proof, [ac, i])
+    for i in range(len(context.ac.server_keys)):
+        assert state.pool.apply(msg_chain.check_server_proof, [context.ac, i])
     linkage_tag = msg_chain.server_proofs[-1].T
-    state.bindings[linkage_tag] = auth_ctx["ephemeral_public_key"]
+    context.bindings[linkage_tag] = auth_ctx["ephemeral_public_key"]
     return {
         "tag" : linkage_tag,
-        "tag_sig" : daga.dsa_sign(server.private_key, linkage_tag)
+        "tag_sig" : daga.dsa_sign(context.server.private_key, linkage_tag)
     }
 
 @route("/internal/bind_linkage_tag", method="POST")
 def internal_bind_linkage_tag():
     return _internal_bind_linkage_tag(request.json)
 
-def internal_call(me, srv, name, data):
-    if srv == me.id:
+@route("/internal/sign_keys", method="POST")
+def internal_sign_keys():
+    return _internal_sign_keys(request.json)
+
+def _internal_sign_keys(d):
+    context = state.contexts[d]
+    b_ks = list(context.bindings.keys())
+    b_ks.sort()
+    h = sha512()
+    for b_k in b_ks:
+        key = context.bindings[b_k]
+        h.update(daga.elem_to_bytes(key))
+    key_hash = h.hexdigest()
+    sig = daga.dsa_sign(context.server.private_key, key_hash.encode("utf-8"))
+    return {
+        "sig" : sig,
+        "key_hash" : key_hash
+    }
+
+def internal_call(ctx, srv, name, data):
+    if srv == ctx.server.id:
         return globals()["_internal_" + name](data)
     return requests.post("http://{}:{}/internal/{}".format(
-                         state.servers[srv].hostname,
-                         state.servers[srv].port, name),
+                         ctx.servers[srv].hostname,
+                         ctx.servers[srv].port, name),
                          headers={"content-type" : "application/json"},
                          data=json.dumps(data)).json()
 
 @route("/request_challenge", method="POST")
 def request_challenge():
     client_data = request.json
-    ac, server = state.contexts[client_data["uuid"]]
+    context = state.contexts[client_data["uuid"]]
     auth_id = str(uuid.uuid4())
     r = {
         "auth_id" : auth_id,
         "client_data" : client_data,
     }
     challenge_parts = []
-    for i in range(len(ac.server_keys)):
-        d = internal_call(server, i, "begin_challenge_generation", r)
+    for i in range(len(context.ac.server_keys)):
+        d = internal_call(context, i, "begin_challenge_generation", r)
         challenge_parts.append((d["n"], d["sig"]))
     r = {
         "auth_id" : auth_id,
         "parts" : challenge_parts,
     }
     sigs = []
-    for i in range(len(ac.server_keys)):
-        d = internal_call(server, i, "finish_challenge_generation", r)
+    for i in range(len(context.ac.server_keys)):
+        d = internal_call(context, i, "finish_challenge_generation", r)
         challenge = d["challenge"]
         sigs.append(d["sig"])
     return {"auth_id" : auth_id, "challenge" : challenge, "sigs" : sigs}
@@ -136,7 +161,7 @@ def request_challenge():
 def authenticate():
     client_data = request.json
     auth_ctx = state.active_auths[client_data["auth_id"]]
-    ac, server = state.contexts[auth_ctx["uuid"]]
+    context = state.contexts[auth_ctx["uuid"]]
     proofs = []
     r = {
         "auth_id" : client_data["auth_id"],
@@ -144,21 +169,43 @@ def authenticate():
         "R" : client_data["R"],
         "server_proofs" : proofs, # Will be mutated.
     }
-    for i in range(len(ac.server_keys)):
-        d = internal_call(server, i, "check_challenge_response", r)
+    for i in range(len(context.ac.server_keys)):
+        d = internal_call(context, i, "check_challenge_response", r)
         proofs.append(d["proof"])
     r = {
         "auth_id" : client_data["auth_id"],
         "server_proofs" : proofs,
     }
     sigs = []
-    for i in range(len(ac.server_keys)):
-        d = internal_call(server, i, "bind_linkage_tag", r)
+    for i in range(len(context.ac.server_keys)):
+        d = internal_call(context, i, "bind_linkage_tag", r)
         tag = d["tag"]
         sigs.append(d["tag_sig"])
     return {
         "tag" : tag,
         "tag_sigs" : sigs,
+    }
+
+@route("/dump_keys", method="POST")
+def dump_keys():
+    c_uuid = request.json
+    context = state.contexts[c_uuid]
+
+    key_sigs = []
+    expected_key_hash = None
+    for i in range(len(context.ac.server_keys)):
+        d = internal_call(context, i, "sign_keys", c_uuid)
+        sig = d["sig"]
+        key_hash = d["key_hash"].encode("utf-8")
+        if expected_key_hash == None:
+            expected_key_hash = key_hash
+        else:
+            assert key_hash == expected_key_hash
+        daga.dsa_verify(context.ac.server_keys[i], key_hash, sig)
+        key_sigs.append(sig)
+    return {
+        "keys" : list(context.bindings.values()),
+        "key_sigs" : key_sigs
     }
 
 def main():
@@ -203,10 +250,10 @@ def main():
             uri = urlparse("http://localhost:" + str(12345 + i))
             servers.append(uri)
 
-    state = GlobalState({uuid : (ac, server)}, servers)
+    state = GlobalState({uuid : Context(ac, server, servers)})
 
     uri = servers[server.id]
-    run(server='cherrypy', host=uri.hostname, port=uri.port)
+    run(server="cherrypy", host=uri.hostname, port=uri.port)
 
 if __name__ == "__main__":
     main()
