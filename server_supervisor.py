@@ -9,8 +9,13 @@ import sys
 
 def main():
     p = argparse.ArgumentParser(description="Run some DAGA servers")
-    p.add_argument("context_dir")
+    p.add_argument("-c", "--context_dir", required=True)
+    p.add_argument("-a", "--auth_engine")
     opts = p.parse_args()
+
+    app = "dagad.py"
+    if opts.auth_engine != None:
+        app = opts.auth_engine
 
     ac_file = os.path.join(opts.context_dir, "context.json")
     with open(ac_file, "r", encoding="utf-8") as fp:
@@ -21,7 +26,7 @@ def main():
         procs = []
         for i in range(n_servers):
             priv_file = os.path.join(opts.context_dir, "server-{}.json".format(i))
-            p = subprocess.Popen([sys.executable, "dagad.py", "-a", ac_file, "-p", priv_file],
+            p = subprocess.Popen([sys.executable, app, "-a", ac_file, "-p", priv_file],
                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             procs.append(p)
         while True:
