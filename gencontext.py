@@ -5,7 +5,8 @@ import random
 import shutil
 import uuid
 
-from daga import G, P, Q
+from hashlib import sha512
+from daga import G, P, Q, elem_to_bytes
 
 def random_dh_key():
     # The secret should be the same bit length as P.
@@ -38,18 +39,23 @@ def main():
                 generators.append(candidate)
                 break
     iden = str(uuid.uuid4())
+    h = sha512()
+    for key in client_pub_keys:
+        h.update(elem_to_bytes(key))
+    group_gen = pow(G, int.from_bytes(h.digest(), 'big') % Q, P)
     ac = {
         "uuid" : iden,
         "client_public_keys" : client_pub_keys,
         "server_public_keys" : server_pub_keys,
         "server_randomness" : server_randomness,
         "generators" : generators,
+        "group_generator" : group_gen,
     }
     with open(os.path.join(opts.output_dir, "context.json"), "w", encoding="utf-8") as fp:
         json.dump(ac, fp)
     for i, key in enumerate(client_priv_keys):
         with open(os.path.join(opts.output_dir, "client-{}.json".format(i)), "w", encoding="utf-8") as fp:
-            json.dump({"uuid" : iden, "n" : i, "private_key" : key}, fp)
+            json.dump({"uuid" : iden, "n" : i, "private_key" : key, "tag" : pow(group_gen, key, P)}, fp)
     for i, (key, secret) in enumerate(zip(server_priv_keys, server_secrets)):
         with open(os.path.join(opts.output_dir, "server-{}.json".format(i)), "w", encoding="utf-8") as fp:
             json.dump({"uuid" : iden, "n" : i, "private_key" : key, "secret" : secret}, fp)
