@@ -31,7 +31,7 @@ class GlobalState:
 
     def __init__(self, contexts):
         self.contexts = contexts
-        self.pool = multiprocessing.Pool(1)
+        self.pool = multiprocessing.Pool()
 
 @route("/internal/sign_keys", method="POST")
 def internal_sign_keys():
@@ -76,7 +76,6 @@ def submit_key():
     client_data = request.json
     context = state.contexts[client_data["uuid"]]
     sig = client_data["sig"]
-    print(client_data)
     pub_key = client_data["pub_key"]
     assert context.verifier.verify(str(pub_key), sig)
     for srv in range(len(context.servers)):
@@ -161,7 +160,7 @@ def main():
     state = GlobalState({uuid : Context(ac, server_id, server_key, servers, verifier)})
 
     uri = servers[server_id]
-    run(host=uri.hostname, port=uri.port)
+    run(server="cherrypy", host=uri.hostname, port=uri.port)
 
 if __name__ == "__main__":
     main()
