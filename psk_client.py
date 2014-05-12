@@ -7,7 +7,6 @@ import sys
 from urllib.parse import urlparse
 
 import daga
-import lrs
 
 
 def main():

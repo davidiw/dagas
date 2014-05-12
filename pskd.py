@@ -15,7 +15,6 @@ from urllib.parse import urlparse
 from bottle import request, route, run
 
 import daga
-import lrs
 
 class Context:
 
@@ -30,7 +29,7 @@ class GlobalState:
 
     def __init__(self, contexts):
         self.contexts = contexts
-        self.pool = multiprocessing.Pool(1)
+        self.pool = multiprocessing.Pool()
 
 @route("/internal/sign_keys", method="POST")
 def internal_sign_keys():
