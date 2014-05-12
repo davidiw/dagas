@@ -21,13 +21,7 @@ def main():
     with open(opts.auth_context, "r", encoding="utf-8") as fp:
         ac_data = json.load(fp)
         uuid = ac_data["uuid"]
-        group_gen = ac_data["group_generator"]
-        ac = daga.AuthenticationContext(
-            ac_data["client_public_keys"],
-            ac_data["server_public_keys"],
-            ac_data["server_randomness"],
-            ac_data["generators"]
-        )
+        server_len = len(ac_data["server_public_keys"])
 
     with open(opts.private_data, "r", encoding="utf-8") as fp:
         p_data = json.load(fp)
@@ -37,11 +31,11 @@ def main():
         priv_key = p_data["private_key"]
         index = p_data["n"]
 
-    server_index = random.randint(0, len(ac.server_keys) - 1)
+    server_index = random.randint(0, server_len - 1)
     if opts.server_list != None:
         with open(opts.server_list, "r", encoding="utf-8") as fp:
             server_list = json.load(fp)
-            assert len(server_list) == len(ac.server_keys)
+            assert len(server_list) == server_len
             server = urlparse(server_list[str(server_index)])
             assert server.hostname != None
             assert server.port != None
