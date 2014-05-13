@@ -35,7 +35,7 @@ def main():
             sys.exit(1)
         client = daga.Client(p_data["n"], p_data["private_key"])
 
-    server_index = random.randint(0, len(ac.server_keys) - 1)
+    server_index = 0 #random.randint(0, len(ac.server_keys) - 1)
     if opts.server_list != None:
         with open(opts.server_list, "r", encoding="utf-8") as fp:
             server_list = json.load(fp)

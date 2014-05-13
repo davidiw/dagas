@@ -21,7 +21,8 @@ def main():
         uuid = ac_data["uuid"]
         server_len = len(ac_data["server_public_keys"])
 
-    server_index = random.randint(0, server_len - 1)
+    server_index = 0 #random.randint(0, len(ac.server_keys) - 1)
+#    server_index = random.randint(0, server_len - 1)
     if opts.server_list != None:
         with open(opts.server_list, "r", encoding="utf-8") as fp:
             server_list = json.load(fp)
