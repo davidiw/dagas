@@ -238,7 +238,7 @@ def main():
             server_dict = json.load(fp)
             servers = []
 
-            assert len(server_dict) == len(ac.server_keys)
+#            assert len(server_dict) == len(ac.server_keys)
             for i in range(len(ac.server_keys)):
                 uri = urlparse(server_dict[str(i)])
                 assert uri.hostname != None

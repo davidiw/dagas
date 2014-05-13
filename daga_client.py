@@ -39,7 +39,7 @@ def main():
     if opts.server_list != None:
         with open(opts.server_list, "r", encoding="utf-8") as fp:
             server_list = json.load(fp)
-            assert len(server_list) == len(ac.server_keys)
+#            assert len(server_list) == len(ac.server_keys)
             server = urlparse(server_list[str(server_index)])
             assert server.hostname != None
             assert server.port != None
