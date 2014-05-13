@@ -13,6 +13,8 @@ def main():
     p = argparse.ArgumentParser(description="Authenticate with LRS")
     p.add_argument("-a", "--auth_context", required=True,
                    help="The path to the authentication context folder")
+    p.add_argument("-p", "--private_data",
+                   help="Path to the servers private data")
     p.add_argument("-s", "--server_list", help="List of servers uris")
     opts = p.parse_args()
 
