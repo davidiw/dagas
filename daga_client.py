@@ -8,6 +8,9 @@ from urllib.parse import urlparse
 
 import daga
 
+import resource
+start = (resource.getrusage(resource.RUSAGE_SELF), resource.getrusage(resource.RUSAGE_CHILDREN))
+
 
 def main():
     p = argparse.ArgumentParser(description="Authenticate with DAGA")
@@ -74,7 +77,10 @@ def main():
     tag = resp["tag"]
     for pub, tag_sig in zip(ac.server_keys, resp["tag_sigs"]):
         daga.dsa_verify(pub, tag, tag_sig)
-    print("Well, that seemed to work.")
 
 if __name__ == "__main__":
     main()
+
+end = (resource.getrusage(resource.RUSAGE_SELF), resource.getrusage(resource.RUSAGE_CHILDREN))
+print(str(end[0].ru_utime + end[1].ru_utime - start[0].ru_utime - start[1].ru_utime))
+print(str(end[0].ru_stime + end[1].ru_stime - start[0].ru_stime - start[1].ru_stime))

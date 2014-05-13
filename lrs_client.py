@@ -9,6 +9,9 @@ from urllib.parse import urlparse
 import daga
 import lrs
 
+import resource
+start = (resource.getrusage(resource.RUSAGE_SELF), resource.getrusage(resource.RUSAGE_CHILDREN))
+
 
 def main():
     p = argparse.ArgumentParser(description="Authenticate with LRS")
@@ -63,7 +66,10 @@ def main():
                          headers={"content-type" : "application/json"},
                          data=json.dumps(d)).json()
     assert resp
-    print("Well, that seemed to work.")
 
 if __name__ == "__main__":
     main()
+
+end = (resource.getrusage(resource.RUSAGE_SELF), resource.getrusage(resource.RUSAGE_CHILDREN))
+print(str(end[0].ru_utime + end[1].ru_utime - start[0].ru_utime - start[1].ru_utime))
+print(str(end[0].ru_stime + end[1].ru_stime - start[0].ru_stime - start[1].ru_stime))
