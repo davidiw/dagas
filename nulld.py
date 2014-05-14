@@ -15,6 +15,7 @@ from urllib.parse import urlparse
 from bottle import request, route, run
 
 import daga
+from server import Server
 
 class Context:
 
@@ -156,7 +157,7 @@ def main():
     state = GlobalState({uuid : Context(ac, server_id, server_key, servers)})
 
     uri = servers[server_id]
-    run(server="cherrypy", host=uri.hostname, port=uri.port)
+    run(server=Server, host=uri.hostname, port=uri.port)
 
 if __name__ == "__main__":
     main()
