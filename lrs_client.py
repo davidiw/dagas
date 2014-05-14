@@ -15,6 +15,8 @@ start = (resource.getrusage(resource.RUSAGE_SELF), resource.getrusage(resource.R
 
 
 def main():
+    start = time.clock()
+
     p = argparse.ArgumentParser(description="Authenticate with LRS")
     p.add_argument("-a", "--auth_context", required=True,
                    help="The path to the authentication context folder")
@@ -63,15 +65,18 @@ def main():
         "pub_key" : pub_key,
         "sig" : sig,
     }
+
+    print(time.clock() - start)
+    start = time.clock()
+
     resp = requests.post("http://" + server.netloc + "/submit_key",
                          headers={"content-type" : "application/json"},
                          data=json.dumps(d)).json()
+
+    print(time.clock() - start)
+    start = time.clock()
+
     assert resp
 
 if __name__ == "__main__":
     main()
-
-end = (resource.getrusage(resource.RUSAGE_SELF), resource.getrusage(resource.RUSAGE_CHILDREN), time.clock())
-print(str(end[2] - start[2]))
-print(str(end[0].ru_utime + end[1].ru_utime - start[0].ru_utime - start[1].ru_utime))
-print(str(end[0].ru_stime + end[1].ru_stime - start[0].ru_stime - start[1].ru_stime))

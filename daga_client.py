@@ -9,11 +9,8 @@ from urllib.parse import urlparse
 
 import daga
 
-import resource
-start = (resource.getrusage(resource.RUSAGE_SELF), resource.getrusage(resource.RUSAGE_CHILDREN), time.clock())
-
-
 def main():
+    start = time.clock()
     p = argparse.ArgumentParser(description="Authenticate with DAGA")
     p.add_argument("-a", "--auth_context", required=True,
                    help="The path to the authentication context folder")
@@ -59,9 +56,17 @@ def main():
         "commitments" : state.commitments,
         "T" : state.T,
     }
+
+    print(time.clock() - start)
+    start = time.clock()
+
     resp = requests.post("http://" + server.netloc + "/request_challenge",
                          headers={"content-type" : "application/json"},
                          data=json.dumps(d)).json()
+
+    print(time.clock() - start)
+    start = time.clock()
+
     auth_id = resp["auth_id"]
     challenge = resp["challenge"]
     for pub, sig in zip(ac.server_keys, resp["sigs"]):
@@ -72,17 +77,23 @@ def main():
         "C" : state.proof.C,
         "R" : state.proof.R,
     }
+
+    print(time.clock() - start)
+    start = time.clock()
+
     resp = requests.post("http://" + server.hostname + ":" + str(server.port) + "/authenticate",
                          headers={"content-type" : "application/json"},
                          data=json.dumps(d)).json()
+
+    print(time.clock() - start)
+    start = time.clock()
+
     tag = resp["tag"]
     for pub, tag_sig in zip(ac.server_keys, resp["tag_sigs"]):
         daga.dsa_verify(pub, tag, tag_sig)
 
+    print(time.clock() - start)
+
 if __name__ == "__main__":
     main()
 
-end = (resource.getrusage(resource.RUSAGE_SELF), resource.getrusage(resource.RUSAGE_CHILDREN), time.clock())
-print(str(end[2] - start[2]))
-print(str(end[0].ru_utime + end[1].ru_utime - start[0].ru_utime - start[1].ru_utime))
-print(str(end[0].ru_stime + end[1].ru_stime - start[0].ru_stime - start[1].ru_stime))

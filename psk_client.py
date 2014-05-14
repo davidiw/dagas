@@ -26,8 +26,7 @@ def main():
         uuid = ac_data["uuid"]
         server_len = len(ac_data["server_public_keys"])
 
-    global start
-    start = (resource.getrusage(resource.RUSAGE_SELF), resource.getrusage(resource.RUSAGE_CHILDREN), time.clock())
+    start = time.clock()
     with open(opts.private_data, "r", encoding="utf-8") as fp:
         p_data = json.load(fp)
         if p_data["uuid"] != uuid:
@@ -58,15 +57,15 @@ def main():
         "index" : index,
         "sig" : sig,
     }
+
+    print(time.clock() - start)
+    start = time.clock()
+
     resp = requests.post("http://" + server.netloc + "/submit_key",
                          headers={"content-type" : "application/json"},
                          data=json.dumps(d)).json()
     assert resp
+    print(time.clock() - start)
 
 if __name__ == "__main__":
     main()
-
-end = (resource.getrusage(resource.RUSAGE_SELF), resource.getrusage(resource.RUSAGE_CHILDREN), time.clock())
-print(str(end[2] - start[2]))
-print(str(end[0].ru_utime + end[1].ru_utime - start[0].ru_utime - start[1].ru_utime))
-print(str(end[0].ru_stime + end[1].ru_stime - start[0].ru_stime - start[1].ru_stime))
