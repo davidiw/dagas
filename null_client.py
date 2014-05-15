@@ -26,7 +26,7 @@ def main():
         uuid = ac_data["uuid"]
         server_len = len(ac_data["server_public_keys"])
 
-    start = time.clock()
+    start = time.time()
     server_index = 0 #random.randint(0, len(ac.server_keys) - 1)
 #    server_index = random.randint(0, server_len - 1)
     if opts.server_list != None:
@@ -47,14 +47,14 @@ def main():
         "pub_key" : pub_key,
     }
 
-    print(time.clock() - start)
-    start = time.clock()
+    print(time.time() - start)
+    start = time.time()
 
     resp = requests.post("http://" + server.netloc + "/submit_key",
                          headers={"content-type" : "application/json"},
                          data=json.dumps(d)).json()
     assert resp
-    print(time.clock() - start)
+    print(time.time() - start)
 
 if __name__ == "__main__":
     main()

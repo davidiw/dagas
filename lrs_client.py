@@ -11,11 +11,11 @@ import daga
 import lrs
 
 import resource
-start = (resource.getrusage(resource.RUSAGE_SELF), resource.getrusage(resource.RUSAGE_CHILDREN), time.clock())
+start = (resource.getrusage(resource.RUSAGE_SELF), resource.getrusage(resource.RUSAGE_CHILDREN), time.time())
 
 
 def main():
-    start = time.clock()
+    start = time.time()
 
     p = argparse.ArgumentParser(description="Authenticate with LRS")
     p.add_argument("-a", "--auth_context", required=True,
@@ -66,15 +66,15 @@ def main():
         "sig" : sig,
     }
 
-    print(time.clock() - start)
-    start = time.clock()
+    print(time.time() - start)
+    start = time.time()
 
     resp = requests.post("http://" + server.netloc + "/submit_key",
                          headers={"content-type" : "application/json"},
                          data=json.dumps(d)).json()
 
-    print(time.clock() - start)
-    start = time.clock()
+    print(time.time() - start)
+    start = time.time()
 
     assert resp
 

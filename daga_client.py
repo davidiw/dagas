@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 import daga
 
 def main():
-    start = time.clock()
+    start = time.time()
     p = argparse.ArgumentParser(description="Authenticate with DAGA")
     p.add_argument("-a", "--auth_context", required=True,
                    help="The path to the authentication context folder")
@@ -57,15 +57,15 @@ def main():
         "T" : state.T,
     }
 
-    print(time.clock() - start)
-    start = time.clock()
+    print(time.time() - start)
+    start = time.time()
 
     resp = requests.post("http://" + server.netloc + "/request_challenge",
                          headers={"content-type" : "application/json"},
                          data=json.dumps(d)).json()
 
-    print(time.clock() - start)
-    start = time.clock()
+    print(time.time() - start)
+    start = time.time()
 
     auth_id = resp["auth_id"]
     challenge = resp["challenge"]
@@ -78,21 +78,21 @@ def main():
         "R" : state.proof.R,
     }
 
-    print(time.clock() - start)
-    start = time.clock()
+    print(time.time() - start)
+    start = time.time()
 
     resp = requests.post("http://" + server.hostname + ":" + str(server.port) + "/authenticate",
                          headers={"content-type" : "application/json"},
                          data=json.dumps(d)).json()
 
-    print(time.clock() - start)
-    start = time.clock()
+    print(time.time() - start)
+    start = time.time()
 
     tag = resp["tag"]
     for pub, tag_sig in zip(ac.server_keys, resp["tag_sigs"]):
         daga.dsa_verify(pub, tag, tag_sig)
 
-    print(time.clock() - start)
+    print(time.time() - start)
 
 if __name__ == "__main__":
     main()
