@@ -3,6 +3,7 @@ import json
 import random
 import requests
 import sys
+import time
 
 from urllib.parse import urlparse
 
@@ -32,20 +33,25 @@ def main():
     if opts.server_list != None:
         with open(opts.server_list, "r", encoding="utf-8") as fp:
             server_list = json.load(fp)
-            assert len(server_list) == len(ac.server_keys)
+#            assert len(server_list) == len(ac.server_keys)
             server = urlparse(server_list[str(server_index)])
             assert server.hostname != None
             assert server.port != None
     else:
         server = urlparse("http://localhost:" + str(12345 + server_index))
 
-    server = urlparse("http://localhost:12345")
+    start = time.time()
+    resp = requests.post("http://" + server.netloc + "/dump_keys",
+                         headers={"content-type" : "application/json"},
+                         data=json.dumps(uuid))
+    print(resp.text)
     resp = requests.post("http://" + server.netloc + "/dump_keys",
                          headers={"content-type" : "application/json"},
                          data=json.dumps(uuid)).json()
 
     with open(opts.output, "w", encoding="utf-8") as fp:
         json.dump(resp, fp)
+    print(str(time.time() - start))
 
 if __name__ == "__main__":
     main()

@@ -13,6 +13,7 @@ import requests
 from hashlib import sha512
 from urllib.parse import urlparse
 from bottle import request, route, run
+from threading import Thread
 
 import daga
 from server import Server
@@ -31,6 +32,26 @@ class GlobalState:
     def __init__(self, contexts):
         self.contexts = contexts
         self.pool = multiprocessing.Pool()
+
+class InternalCall(Thread):
+
+    def __init__(self, ctx, srv, name, data):
+        Thread.__init__(self)
+        self.ctx = ctx
+        self.srv = srv
+        self.name = name
+        self.data = data
+        self.result = None
+
+    def run(self):
+        if self.srv == self.ctx.server_id:
+            self.result = globals()["_internal_" + self.name](self.data)
+        else:
+            self.result = requests.post("http://{}:{}/internal/{}".format(
+                                 self.ctx.servers[self.srv].hostname,
+                                 self.ctx.servers[self.srv].port, self.name),
+                                 headers={"content-type" : "application/json"},
+                                 data=json.dumps(self.data)).json()
 
 @route("/internal/sign_keys", method="POST")
 def internal_sign_keys():
@@ -60,14 +81,24 @@ def internal_submit_key():
     context.bindings[auth_id] = pub_key
     return {"result": "True"}
 
-def internal_call(ctx, srv, name, data):
-    if srv == ctx.server_id:
-        return globals()["_internal_" + name](data)
-    return requests.post("http://{}:{}/internal/{}".format(
-                         ctx.servers[srv].hostname,
-                         ctx.servers[srv].port, name),
-                         headers={"content-type" : "application/json"},
-                         data=json.dumps(data)).json()
+def internal_call(ctx, name, data, ignoreme=False):
+    ics = []
+
+    for i in range(len(ctx.ac.server_keys)):
+        if i == ctx.server_id and ignoreme:
+            continue
+        ic = InternalCall(ctx, i, name, data)
+        ics.append(ic)
+        ic.start()
+
+    for ic in ics:
+        ic.join()
+
+    res = []
+    for ic in ics:
+        res.append(ic.result)
+
+    return res
 
 @route("/submit_key", method="POST")
 def submit_key():
@@ -76,14 +107,7 @@ def submit_key():
     pub_key = client_data["pub_key"]
     auth_id = str(uuid.uuid4())
     client_data["auth_id"] = auth_id
-    for srv in range(len(context.servers)):
-        if srv == context.server_id:
-            continue
-        requests.post("http://{}:{}/internal/{}".format(
-                             context.servers[srv].hostname,
-                             context.servers[srv].port, "submit_key"),
-                             headers={"content-type" : "application/json"},
-                             data=json.dumps(client_data)).json()
+    internal_call(context, "submit_key", client_data, True)
     context.bindings[auth_id] = pub_key
     return {"result" : "True"}
 
@@ -91,20 +115,22 @@ def submit_key():
 def dump_keys():
     c_uuid = request.json
     context = state.contexts[c_uuid]
-    print(context.bindings)
 
     key_sigs = []
     expected_key_hash = None
-    for i in range(len(context.ac.server_keys)):
-        d = internal_call(context, i, "sign_keys", c_uuid)
+    res = internal_call(context, "sign_keys", c_uuid)
+
+    for idx in range(len(res)):
+        d = res[idx]
         sig = d["sig"]
         key_hash = d["key_hash"].encode("utf-8")
         if expected_key_hash == None:
             expected_key_hash = key_hash
         else:
             assert key_hash == expected_key_hash
-        daga.dsa_verify(context.ac.server_keys[i], key_hash, sig)
+        daga.dsa_verify(context.ac.server_keys[idx], key_hash, sig)
         key_sigs.append(sig)
+
     return {
         "keys" : list(context.bindings.values()),
         "key_sigs" : key_sigs

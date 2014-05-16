@@ -23,6 +23,7 @@ class Server(bottle.ServerAdapter):
             server.ssl_private_key = keyfile
         server.max_request_body_size = 2**40
         server.max_request_header_size = 2**40
+        server.request_queue_size = 1024
 
         try:
             server.start()
