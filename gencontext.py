@@ -6,7 +6,7 @@ import shutil
 import uuid
 
 from hashlib import sha512
-from daga import G, P, Q, elem_to_bytes
+from daga import G, P, Q, dsa_sign, elem_to_bytes
 
 def random_dh_key():
     # The secret should be the same bit length as P.
@@ -51,6 +51,23 @@ def main():
         "generators" : generators,
         "group_generator" : group_gen,
     }
+
+    h = sha512()
+    h.update(json.dumps(ac["uuid"]).encode("utf-8"))
+    h.update(json.dumps(ac["client_public_keys"]).encode("utf-8"))
+    h.update(json.dumps(ac["server_public_keys"]).encode("utf-8"))
+    h.update(json.dumps(ac["generators"]).encode("utf-8"))
+    h.update(json.dumps(ac["group_generator"]).encode("utf-8"))
+    acs = h.digest()
+
+    signatures = []
+    for key in server_priv_keys:
+        signatures.append(dsa_sign(key, acs))
+
+    print(acs)
+
+    ac["signatures"] = signatures
+
     with open(os.path.join(opts.output_dir, "context.json"), "w", encoding="utf-8") as fp:
         json.dump(ac, fp)
     for i, key in enumerate(client_priv_keys):

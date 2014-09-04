@@ -217,7 +217,8 @@ def main():
                    help="The path to the authentication context folder")
     p.add_argument("-p", "--private_data", required=True,
                    help="Path to the servers private data")
-    p.add_argument("-s", "--server_list", help="List of servers uris")
+    p.add_argument("-s", "--server_list", help="List of servers uris",
+                   required=True)
     opts = p.parse_args()
 
     with open(opts.auth_context, "r", encoding="utf-8") as fp:
@@ -230,26 +231,31 @@ def main():
             ac_data["generators"]
         )
 
+    h = sha512()
+    h.update(json.dumps(ac_data["uuid"]).encode("utf-8"))
+    h.update(json.dumps(ac_data["client_public_keys"]).encode("utf-8"))
+    h.update(json.dumps(ac_data["server_public_keys"]).encode("utf-8"))
+    h.update(json.dumps(ac_data["generators"]).encode("utf-8"))
+    h.update(json.dumps(ac_data["group_generator"]).encode("utf-8"))
+    acs = h.digest()
+
+    for key, signature in zip(ac.server_keys, ac_data["signatures"]):
+        daga.dsa_verify(key, acs, signature)
+
     with open(opts.private_data, "r", encoding="utf-8") as fp:
         priv_data = json.load(fp)
         server = daga.Server(priv_data["n"], priv_data["private_key"], priv_data["secret"])
 
-    if opts.server_list != None:
-        with open(opts.server_list, "r", encoding="utf-8") as fp:
-            server_dict = json.load(fp)
-            servers = []
+    with open(opts.server_list, "r", encoding="utf-8") as fp:
+        server_dict = json.load(fp)
+    servers = []
 
-#            assert len(server_dict) == len(ac.server_keys)
-            for i in range(len(ac.server_keys)):
-                uri = urlparse(server_dict[str(i)])
-                assert uri.hostname != None
-                assert uri.port != None
-                servers.append(uri)
-    else:
-        servers = []
-        for i in range(len(ac.server_keys)):
-            uri = urlparse("http://localhost:" + str(12345 + i))
-            servers.append(uri)
+    assert len(server_dict) <= len(ac.server_keys)
+    for i in range(len(ac.server_keys)):
+        uri = urlparse(server_dict[str(i)])
+        assert uri.hostname != None
+        assert uri.port != None
+        servers.append(uri)
 
     state = GlobalState({uuid : Context(ac, server, servers)})
 

@@ -9,8 +9,16 @@ from urllib.parse import urlparse
 
 import daga
 
-import resource
+ltime = time.time()
+bench = False
+def benchmark():
+    if not bench:
+        pass
 
+    ctime = time.time()
+    global ltime
+    print(ctime - ltime)
+    ltime = ctime
 
 def main():
     p = argparse.ArgumentParser(description="Authenticate with LRS")
@@ -18,26 +26,28 @@ def main():
                    help="The path to the authentication context folder")
     p.add_argument("-p", "--private_data",
                    help="Path to the servers private data")
-    p.add_argument("-s", "--server_list", help="List of servers uris")
+    p.add_argument("-s", "--server_list", help="List of servers uris",
+            required=True)
+    p.add_argument("-b", "--benchmark", help="Enable benchmarking",
+                   dest="bench", action="store_true")
     opts = p.parse_args()
+
+    global bench
+    bench = opts.bench
 
     with open(opts.auth_context, "r", encoding="utf-8") as fp:
         ac_data = json.load(fp)
         uuid = ac_data["uuid"]
         server_len = len(ac_data["server_public_keys"])
 
-    start = time.time()
-    server_index = 0 #random.randint(0, len(ac.server_keys) - 1)
-#    server_index = random.randint(0, server_len - 1)
-    if opts.server_list != None:
-        with open(opts.server_list, "r", encoding="utf-8") as fp:
-            server_list = json.load(fp)
-#            assert len(server_list) == server_len
-            server = urlparse(server_list[str(server_index)])
-            assert server.hostname != None
-            assert server.port != None
-    else:
-        server = urlparse("http://localhost:" + str(12345 + server_index))
+    with open(opts.server_list, "r", encoding="utf-8") as fp:
+        server_list = json.load(fp)
+
+    server_index = random.randint(0, len(server_list) - 1)
+    assert len(server_list) <= server_len
+    server = urlparse(server_list[str(server_index)])
+    assert server.hostname != None
+    assert server.port != None
 
     priv_key = daga.random_dh_key()
     pub_key = pow(daga.G, priv_key, daga.P)
@@ -47,14 +57,13 @@ def main():
         "pub_key" : pub_key,
     }
 
-    print(time.time() - start)
-    start = time.time()
+    benchmark()
 
     resp = requests.post("http://" + server.netloc + "/submit_key",
                          headers={"content-type" : "application/json"},
                          data=json.dumps(d)).json()
     assert resp
-    print(time.time() - start)
+    benchmark()
 
 if __name__ == "__main__":
     main()

@@ -1,3 +1,58 @@
+AAProxy
+
+Overview
+===============================================================================
+AAProxy is a light-weight anonymous authentication proxy that allows existing
+services that support public key authentication to support anonymous
+authentication. Clients register their key with a specific service. This
+service, in turn, uploads a set of client keys to a dedicated AAProxy system.
+Clients then authenticate to the AAProxy service to securely exchange a
+pseudonym key. The service can poll AAProxy for the current roster of
+pseudonym keys.
+
+AAProxy currently supports DAGA (Deniable, Forward-Secure Group Anonymity),
+LRS (Linkable Ring Singatures), PSK (Preshared Keys), and NULL (open
+authentication).
+
+An AAProxy service consists of 1 or more servers, who each take part in
+authenticating clients and certifying the roster of pseudonyms. AAProxy uses
+an anytrust assumption such that a service and client using AAProxy can trust
+it so long as there exists one honest AAProxy server. Clients trust that their
+anonymity will not be compromised, while service using AAProxy trust that the
+AAProxy will not launch a sybil attack.
+
+Workflow
+===============================================================================
+An authentication context must be generated prior to running any of these
+proxies. For testing purposes, we have included a script: gencontext.py that
+will produce a valid testing context as well as client and server keys.  The
+context consists of content necessary to perform any of the above
+authentications, though in practice, normally one method is chosen.
+Furthermore, to generate a proper context requires each server to contribute
+to a common seed used to produce the set of generators. Dissent incorporates a
+session establishment process that we could also use to produce these
+generators. Finally, each server signs the context for a group and the end
+service publishes it.
+
+AAProxy servers use their private key, this group context, and a list of other
+servers as input. During client authentications, servers communicate with each
+other to ensure that each server has a complete and correct view of the
+pseudonym roster.
+
+The AAProxy administrator must produce a list of servers in json format:
+{"0": "http://server0:12345", ...}
+
+Outside of AAProxy, clients register a public key to be included in the
+context. At which point they can connect to any of the AAProxy servers,
+perform the supported form of authentication, and transmit a new pseudonym
+key. At the conclusion, they will be included in the roster of pseudonym keys.
+
+A web service can poll AAProxy for updates. If a client tries to authenticate
+with an unrecognized key, the service should check with AAProxy to learn if
+any new keys have been added to the roster.
+
+Prerequisites
+===============================================================================
 You'll need Python 3 and some other Python packages. I recommend using virtualenv
 (http://virtualenv.org) to create a local Python environment. Then you can do
 something like
@@ -7,20 +62,22 @@ something like
 
 Now, whenever you seen "python3" below, write "myenv/bin/python" instead.
 
-To generate a DAGA authentication context run:
+Using
+===============================================================================
+AAProxy consists of a set of python scripts. Each authentication protocol
+consists of a client and server script: *_client.py and *d.py. The protocols
+supported and their matching scripts:
 
-    $ python3 gencontext.py a_context
+DAGA - daga_client.py dagad.py
+LRS - lrs_client.py lrsd.py
+PSK - psk_client.py pskd.py
+NULL - null_client.py nulld.py
 
-This creates a random DAGA context and dumps a lot of data into the directory
-a_context. You can change the number of servers and clients with the -s and -c
-options respectively.
+To start a server:
+python3 dagad.py -a context.json -p server-0.json -s servers
 
-The run DAGA servers locally, use the server_supervisor script:
+To start a client:
+python3 daga_client.py -a context.json -p client-0.json -s servers
 
-    $ python3 server_supervisor.py a_context
-
-Then in another terminal, you can perform a client authentication by running
-
-    $ python3 daga_client.py -a ctx/context.json -p ctx/client-0.json
-
-Hopefully that will not fail.
+To obtain the keys:
+python3 key_dump.py -a context.json -s servers -o keys
